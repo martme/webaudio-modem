@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <meta charset="utf-8">
+      <meta http-equiv="x-ua-compatible" content="ie=edge">
+      <title>martinmelhus.com - Web Audio Encoder</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>encoder</h1>
+    <textarea></textarea>
+    <p>
+      <button data-action="encode">encode</button>
+      <button data-action="clear">clear</button>
+      <a class="button" href="index.html">back</a>
+    </p>
+
+    <h2>config</h2>
+    <label for="active-duration">Bit high duration: <span data-val></span> ms
+    <input id="active-duration" type="range" value="100" min="10", max="1000", step="10">
+
+    <label for="pause-duration">Pause between bytes: <span data-val></span> ms
+    <input id="pause-duration" type="range" value="20" min="0", max="500", step="10">
+
+    <script>
+      let oscillators = (function initialize() {
+        const frequencies = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
+        let audioContext = new AudioContext();
+        // create audio nodes
+        let masterGain = audioContext.createGain();
+        masterGain.gain.value = 1.0/frequencies.length;
+        let sinusoids = frequencies.map(f => {
+          let oscillator = audioContext.createOscillator();
+          oscillator.type = 'sine';
+          oscillator.frequency.value = f;
+          oscillator.start();
+          return oscillator;
+        });
+        let oscillators = frequencies.map(f => {
+          let volume = audioContext.createGain();
+          volume.gain.value = 0;
+          return volume;
+        });
+
+        // connect nodes
+        sinusoids.forEach((sine, i) => sine.connect(oscillators[i]));
+        oscillators.forEach((osc) => osc.connect(masterGain));
+        masterGain.connect(audioContext.destination);
+        return oscillators;
+      })();
+
+      const char2oscillators = (char) => {
+        return oscillators.filter((_, i) => {
+          let charCode = char.charCodeAt(0);
+          return charCode & (1 << i);
+        });
+      };
+
+      const mute = () => {
+        oscillators.forEach(osc => {
+          osc.gain.value = 0
+        });
+      }
+
+      const encodeChar = (char, duration) => {
+        let activeOscillators = char2oscillators(char);
+        activeOscillators.forEach(osc => {
+          osc.gain.value = 1;
+        });
+        window.setTimeout(mute, duration);
+      }
+
+
+      const encode = (text, onComplete) => {
+        const pause = +document.querySelector('#pause-duration').value;
+        const duration = +document.querySelector('#active-duration').value;
+        const timeBetweenChars = pause + duration;
+
+        text.split('').forEach((char, i) => {
+          window.setTimeout(() => {
+            encodeChar(char, duration);
+          }, i * timeBetweenChars);
+        });
+        window.setTimeout(onComplete, text.length * timeBetweenChars);
+      };
+
+      let button = document.querySelector('button[data-action="encode"]');
+      button.addEventListener('click', () => {
+        button.setAttribute('disabled', 'disabled');
+        encode(document.querySelector('textarea').value, () => {
+          button.removeAttribute('disabled');
+        });
+      });
+
+      document.querySelector('button[data-action="clear"]').addEventListener('click', (e) => {
+        document.querySelector('textarea').value = '';
+        e.srcElement.blur();
+      });
+
+      // config behaviour
+      document.querySelectorAll('input').forEach(input => {
+        const selector = `label[for="${input.getAttribute('id')}"] [data-val]`;
+        let label = document.querySelector(selector);
+        label.innerHTML = input.value;
+        input.addEventListener('change', (e) => {
+          label.innerHTML = e.srcElement.value;
+        });
+      });
+    </script>
+  </body>
+</html>

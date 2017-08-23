@@ -1,0 +1,55 @@
+body {
+  background-color: rgb(0, 43, 54);
+  padding: 15px 50px;
+}
+
+h1, h2, h3, h4, p, input, textarea, button, code, a.button, label {
+  font-family: Consolas, monospace;
+  color: rgb(253, 246, 227);
+}
+
+h1 {
+  font-size: 15px;
+}
+
+textarea, button, a.button {
+  font-size: 20px;
+  background-color: rgb(0, 43, 54);
+  border: 1px solid rgb(253, 246, 227);
+  padding: 5px 10px;
+  box-sizing: border-box;
+}
+
+a.button {
+  display: inline-block;
+  text-decoration: none;
+}
+
+button:hover, a.button:hover {
+  color: rgb(238, 232, 213);
+  border-color: rgb(238, 232, 213);
+}
+
+a.button:active, a.button:focus, button:active, button:focus {
+  color: rgb(147, 161, 161);
+  border-color: rgb(147, 161, 161);
+  outline: none;
+}
+
+code {
+  font-size: 40px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 100px;
+  overflow-x: scroll;
+}
+
+label, input {
+  display: block;
+  width: 100%;
+}
+input[type="range"] {
+  margin-bottom: 15px;
+}
