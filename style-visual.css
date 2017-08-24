@@ -1,0 +1,71 @@
+
+#piano {
+  margin-top: 15px;
+  display: block;
+  white-space: nowrap;
+  height: 25vh;
+  max-height: 200px;
+  min-height: 100px;
+  background: #aaa;
+  background: #aaa;
+  overflow-y: hidden;
+  overflow-x: scroll;
+}
+
+#piano > div {
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  width: 40px;
+  background: #f9f9f9;
+  display: inline-block;
+  margin-right: 2px;
+  margin-left: 2px;
+
+  color: black;
+}
+
+#piano div span {
+  position: absolute;
+  bottom: 0.5em;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+}
+
+#piano div[data-note='E'],
+#piano div[data-note='B'] {
+  margin-right: 0;
+}
+
+#piano div[data-note$='#'] {
+  background-color: #333;
+  height: 65%;
+  width: 24px;
+  margin-left: calc(-12px - 1px);
+  margin-right: calc(-12px - 1px);
+  z-index: 1;
+  bottom: 35%;
+}
+
+#piano div.pressed {
+  background-color: #aaa;
+}
+
+
+.waveform-container {
+  max-width: 200px;
+}
+
+.trace-container {
+  display: inline-block;
+}
+
+code.trace-binary + code.trace-text {
+  margin-left: 5px;
+}
+
+code.trace-binary + code.trace-text:before {
+  content: '='; 
+  padding-right: 10px;
+}
