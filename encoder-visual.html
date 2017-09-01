@@ -41,13 +41,13 @@
       let audioContext = new AudioContext();
       // create audio nodes
       let masterGain = audioContext.createGain();
-      masterGain.gain.value = 0.9;
+      masterGain.gain.value = 1.0 / frequencies.length;
       masterGain.connect(audioContext.destination);
 
       let analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
       analyser.smoothingTimeConstant = 0.0;
-      analyser.minDecibels = -31;
+      analyser.minDecibels = -62;
 
       masterGain.connect(analyser);
       
