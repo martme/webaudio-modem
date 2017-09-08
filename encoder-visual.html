@@ -120,18 +120,14 @@
             ctx.fillText(2, dx*binIndex - 6, 20);
             ctx.font = "12px monospace";
             ctx.fillText(i, dx*binIndex + 4, 11);
-            ctx.stroke();
           });
 
-          // draw latest response
-          ctx.strokeStyle = `rgb(0, 200, 0)`;
-          ctx.beginPath();
-          let scale = 0.8 * height / 256;
+          // draw latest response bar chart
+          ctx.fillStyle =  `rgb(0, 200, 0)`;
           for (let i = 0; i < bufferLength; i++) {
-            ctx.lineTo(i*dx, height - buffer[i]*scale)
-            if (buffer[i] > 200) {
-              ctx.fillStyle = `rgb(50, ${buffer[i]}, 50)`;
-            }
+            let scale = 0.8 * height / 256;
+            let y = buffer[i]*scale;
+            ctx.fillRect(i*dx, height - y, Math.max(dx - 1, 1), y);
           }
           ctx.stroke();
         }
