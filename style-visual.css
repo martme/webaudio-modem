@@ -66,6 +66,6 @@ code.trace-binary + code.trace-text {
 }
 
 code.trace-binary + code.trace-text:before {
-  content: '='; 
+  content: '=';
   padding-right: 10px;
 }

@@ -29,7 +29,7 @@
     </div>
 
     <h2>config</h2>
-    <label for="waveform">waveform: 
+    <label for="waveform">waveform:
     <select id="waveform">
       <option value="sine">sine</option>
       <option value="square">square</option>
@@ -55,7 +55,7 @@
       analyser.minDecibels = -62;
 
       masterGain.connect(analyser);
-      
+
       let timeBuffer = new Uint8Array(analyser.frequencyBinCount);
       let frequencyBuffer = new Uint8Array(analyser.frequencyBinCount);
       let oscillators = {};
