@@ -38,7 +38,12 @@
 
     <script>
       const frequencies = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
-      let audioContext = new AudioContext();
+      let audioContext;
+      if('webkitAudioContext' in window) {
+         audioContext = new webkitAudioContext();
+      } else {
+        audioContext = new AudioContext();
+      }
       // create audio nodes
       let masterGain = audioContext.createGain();
       masterGain.gain.value = 1.0 / frequencies.length;
