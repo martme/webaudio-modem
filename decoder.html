@@ -40,7 +40,7 @@
       analyser.minDecibels = -58;
 
       // connect nodes
-      navigator.getUserMedia({audio: true}, (stream) => {
+      navigator.mediaDevices.getUserMedia({audio: true}, (stream) => {
         var microphone = audioContext.createMediaStreamSource(stream);
         microphone.connect(analyser);
       }, (err) => { alert("Microphone is required."); });
