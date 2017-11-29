@@ -191,19 +191,17 @@
             domElement.innerHTML = `<span>${note}<sub>${octave}</sub></span>`;
 
           const keyPressed = (e) => {
-            if (e.type === "mousedown" || e.buttons === 1 || e.buttons === 3) {
-              domElement.classList.add('pressed');
-              playFrequency(frequency);
-            }
+            domElement.classList.add('pressed');
+            playFrequency(frequency);
           };
           const keyReleased = (e) => {
             domElement.classList.remove('pressed');
             muteFrequency(frequency);
           };
-          domElement.addEventListener('mousedown', keyPressed, false);
-          domElement.addEventListener('mouseover', keyPressed, false);
-          domElement.addEventListener('mouseup', keyReleased, false);
-          domElement.addEventListener('mouseleave', keyReleased, false);
+          ['mousedown', 'mouseover', 'touchstart', 'touchenter']
+            .forEach(event => domElement.addEventListener(event, keyPressed, false));
+          ['mouseup', 'mouseleave', 'touchend', 'touchleave']
+            .forEach(event => domElement.addEventListener(event, keyReleased, false));
           return domElement;
         };
 
