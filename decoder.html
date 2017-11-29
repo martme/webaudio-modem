@@ -33,6 +33,8 @@
       } else {
         audioContext = new AudioContext();
       }
+
+
       // create audio nodes
       let analyser = audioContext.createAnalyser();
       analyser.fftSize = 512;
@@ -40,10 +42,12 @@
       analyser.minDecibels = -58;
 
       // connect nodes
-      navigator.mediaDevices.getUserMedia({audio: true}, (stream) => {
-        var microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-      }, (err) => { alert("Microphone is required."); });
+      navigator.mediaDevices.getUserMedia({audio: true})
+        .then(stream => {
+          var microphone = audioContext.createMediaStreamSource(stream);
+          microphone.connect(analyser);
+        })
+        .catch(err => { alert("Microphone is required."); });
 
       // buffer for analyser output
       let buffer = new Uint8Array(analyser.frequencyBinCount);
@@ -110,18 +114,18 @@
 
       document.querySelector('button').addEventListener('click', (e) => {
         document.querySelector('textarea[readonly]').innerHTML = '';
-        e.srcElement.blur();
+        e.target.blur();
       });
 
       // config behaviour
-      document.querySelectorAll('input').forEach(input => {
+      for (let input of document.querySelectorAll('input')) {
         const selector = `label[for="${input.getAttribute('id')}"] [data-val]`;
         let label = document.querySelector(selector);
         label.innerHTML = input.value;
         input.addEventListener('change', (e) => {
-          label.innerHTML = e.srcElement.value;
+          label.innerHTML = e.target.value;
         });
-      });
+      };
     </script>
   </body>
 </html>

@@ -267,15 +267,15 @@
       })();
 
       // config behaviour
-      document.querySelectorAll('input').forEach(input => {
+      for (input of document.querySelectorAll('input')) {
         console.log(input);
         const selector = `label[for="${input.getAttribute('id')}"] [data-val]`;
         let label = document.querySelector(selector);
         label.innerHTML = input.value;
         input.addEventListener('change', (e) => {
-          label.innerHTML = e.srcElement.value;
+          label.innerHTML = e.target.value;
         });
-      });
+      };
     </script>
   </body>
 </html>
