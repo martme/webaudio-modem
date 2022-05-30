@@ -9,6 +9,9 @@
       <link rel="stylesheet" href="style-visual.css">
   </head>
   <body>
+    <div class="overlay">
+      <button>Start</button>
+    </div>
     <h1>encoder (visual)</h1>
     <p>
       <a class="button" href="index.html">back</a>
@@ -37,243 +40,251 @@
     </select>
 
     <script>
-      const frequencies = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
-      let audioContext;
-      if('webkitAudioContext' in window) {
-         audioContext = new webkitAudioContext();
-      } else {
-        audioContext = new AudioContext();
+      document.querySelector(".overlay > button").addEventListener("click", (e) => {
+        let overlay = e.currentTarget.parentNode;
+        overlay.parentNode.removeChild(overlay);
+        startVisualEncoder();
+      })
+
+      function startVisualEncoder() {
+        const frequencies = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
+        let audioContext;
+        if('webkitAudioContext' in window) {
+           audioContext = new webkitAudioContext();
+        } else {
+          audioContext = new AudioContext();
+        }
+        // create audio nodes
+        let masterGain = audioContext.createGain();
+        masterGain.gain.value = 1.0 / frequencies.length;
+        masterGain.connect(audioContext.destination);
+
+        let analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.smoothingTimeConstant = 0.0;
+        analyser.minDecibels = -62;
+
+        masterGain.connect(analyser);
+
+        let timeBuffer = new Uint8Array(analyser.frequencyBinCount);
+        let frequencyBuffer = new Uint8Array(analyser.frequencyBinCount);
+        let oscillators = {};
+
+        const playFrequency = (frequency) => {
+          if (frequency in oscillators) return;
+          let osc = audioContext.createOscillator();
+          osc.connect(masterGain);
+          osc.type = document.querySelector(`#waveform`).value;
+          osc.frequency.value = frequency;
+          osc.start();
+          oscillators[frequency] = osc;
+        };
+
+        const muteFrequency = (frequency) => {
+          if (oscillators[frequency]) {
+            oscillators[frequency].stop();
+            oscillators[frequency] = null;
+            delete oscillators[frequency];
+          }
+        };
+
+        (function animateCanvas() {
+          let spectrumCanvas = document.querySelector('canvas.spectrum');
+          let spectrumCtx = spectrumCanvas.getContext('2d');
+
+          let waveformCanvas = document.querySelector('canvas.waveform');
+          let waveformCtx = waveformCanvas.getContext('2d');
+
+          let resizeTimeout = null;
+
+          const adjustCanvasWidth = () => {
+            spectrumCanvas.setAttribute('width', spectrumCanvas.parentNode.offsetWidth);
+            waveformCanvas.setAttribute('width', waveformCanvas.parentNode.offsetWidth);
+          };
+          adjustCanvasWidth();
+          window.addEventListener('resize', (e) => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(adjustCanvasWidth, 100);
+          });
+
+          const frequencyBinIndex = (f) => {
+            const hzPerBin = (audioContext.sampleRate) / (2*analyser.frequencyBinCount);
+            return parseInt((f + hzPerBin/2) / hzPerBin);
+          };
+
+          const drawSpectrum = () => {
+            let ctx = spectrumCtx;
+            let buffer = frequencyBuffer;
+            let canvas = spectrumCanvas;
+            let bufferLength = buffer.byteLength / 5;
+
+            let height = canvas.height;
+
+            const dx = Math.max(1, 1.0*canvas.width / bufferLength);
+            analyser.getByteFrequencyData(buffer);
+
+            // clear canvas
+            ctx.fillStyle = 'rgba(0, 20, 0, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.fillRect(0, 0, canvas.width, height);
+            // draw trigger markers
+            frequencies.forEach((f, i) => {
+              let binIndex = frequencyBinIndex(f);
+              ctx.fillStyle = buffer[binIndex] > 124 ? `rgb(0, 255, 0)` : `rgb(150, 150, 150)`
+              ctx.font = "18px monospace";
+              ctx.fillText(2, dx*binIndex - 6, 20);
+              ctx.font = "12px monospace";
+              ctx.fillText(i, dx*binIndex + 4, 11);
+            });
+
+            // draw latest response bar chart
+            ctx.fillStyle =  `rgb(0, 200, 0)`;
+            for (let i = 0; i < bufferLength; i++) {
+              let scale = 0.8 * height / 256;
+              let y = buffer[i]*scale;
+              ctx.fillRect(i*dx, height - y, Math.max(dx - 1, 1), y);
+            }
+            ctx.stroke();
+          }
+
+          const drawWaveform = () => {
+            let ctx = waveformCtx;
+            let buffer = timeBuffer;
+            let canvas = waveformCanvas;
+            let bufferLength = buffer.byteLength;
+
+            // Based on https://codepen.io/ContemporaryInsanity/pen/Mwvqpb
+            var width = canvas.width;
+            var height = canvas.height;
+            var scaling = height / 256;
+            var risingEdge = 0;
+            var edgeThreshold = 5;
+
+            analyser.getByteTimeDomainData(buffer);
+
+            // clear canvas
+            ctx.fillStyle = 'rgba(0, 10, 0, 0.1)';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgb(0, 200, 0)';
+            ctx.beginPath();
+
+            // No buffer overrun protection
+            while (buffer[risingEdge++] - 128 > 0 && risingEdge <= width);
+            if (risingEdge >= width) risingEdge = 0;
+
+            while (buffer[risingEdge++] - 128 < edgeThreshold && risingEdge <= width);
+            if (risingEdge >= width) risingEdge = 0;
+
+            for (var x = risingEdge; x < buffer.length && x - risingEdge < width; x++)
+              ctx.lineTo(x - risingEdge, height - buffer[x] * scaling);
+
+            ctx.stroke();
+          }
+
+          const draw = () => {
+            drawSpectrum();
+            drawWaveform();
+            let loop = requestAnimationFrame(draw);
+          }
+          draw();
+        })();
+
+        (function createHtmlPiano() {
+          const createDomElement = (frequency, note, octave) => {
+            let domElement = document.createElement('div');
+            domElement.setAttribute('data-note', note);
+            domElement.setAttribute('data-octave', octave);
+            domElement.setAttribute('data-frequency', frequency);
+            if (note === 'C')
+              domElement.innerHTML = `<span>${note}<sub>${octave}</sub></span>`;
+
+            const keyPressed = (e) => {
+              domElement.classList.add('pressed');
+              playFrequency(frequency);
+            };
+            const keyReleased = (e) => {
+              domElement.classList.remove('pressed');
+              muteFrequency(frequency);
+            };
+            ['mousedown', 'mouseover', 'touchstart', 'touchenter']
+              .forEach(event => domElement.addEventListener(event, keyPressed, false));
+            ['mouseup', 'mouseleave', 'touchend', 'touchleave']
+              .forEach(event => domElement.addEventListener(event, keyReleased, false));
+            return domElement;
+          };
+
+
+          let notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
+          let frequencies = [27.5, 29.14, 30.87, 32.7, 34.65, 36.71, 38.89, 41.2, 43.65, 46.25, 49, 51.91, 55, 58.27, 61.74, 65.41, 69.3, 73.42, 77.78, 82.41, 87.31, 92.5, 98, 103.83, 110, 116.54, 123.47, 130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185, 196, 207.65, 220, 233.08, 246.94, 261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392, 415.3, 440, 466.16, 493.88, 523.25, 554.37, 587.33, 622.25, 659.26, 698.46, 739.99, 784, 830.61, 880, 932.33, 987.77, 1046.5, 1108.73, 1174.66, 1244.51, 1318.5, 1396.91, 1479.98, 1568, 1661.22, 1760, 1864.7, 1975.53, 2093, 2217.46, 2349.32, 2489.02, 2637, 2793.83, 2959.96, 3135.96, 3322.44, 3520, 3729.31, 3951.07, 4186.01];
+          let keys = [];
+
+          let domContainer = document.querySelector('#piano');
+          let octave = 0;
+          for (let i = 0; i < frequencies.length; i++) {
+            let note = notes[i % notes.length];
+            if (note === 'C') octave++;
+            let domElement = createDomElement(frequencies[i], note, octave);
+            domContainer.appendChild(domElement);
+          }
+        })();
+
+        (function bindHtmlKeyboard() {
+          const trace = (state, label) => {
+            let str = state.toString(2);
+            let pad = "0b00000000"
+            let text = pad.substring(0, pad.length - str.length) + str;
+            document.querySelector('code.trace-binary').innerHTML = text;
+            document.querySelector('code.trace-text').innerHTML = label;
+          }
+
+
+          const byte2frequencies = (byte) => {
+            return frequencies.filter((_, i) => {
+              return byte & (1 << i);
+            });
+          };
+          const fireEvent = (element, eventType) => {
+            // Thanks to https://stackoverflow.com/a/2706236
+            if (element.fireEvent) {
+              element.fireEvent('on' + eventType);
+            } else {
+              let evObj = document.createEvent('Events');
+              evObj.initEvent(eventType, true, false);
+              element.dispatchEvent(evObj);
+            }
+          };
+          const press = (frequency) => {
+            let key = document.querySelector(`#piano [data-frequency="${frequency}"]`)
+            fireEvent(key, 'mousedown');
+          };
+          const release = (frequency) => {
+            let key = document.querySelector(`#piano [data-frequency="${frequency}"]`)
+            fireEvent(key, 'mouseup');
+          };
+
+          window.addEventListener('keydown', (e) => {
+            var value = e.key.length === 1 ? e.key.charCodeAt(0) : e.keyCode;
+            byte2frequencies(value).forEach(press);
+            trace(value, e.key);
+          });
+          window.addEventListener('keyup', (e) => {
+            frequencies.forEach(release);
+          });
+        })();
+
+        // config behaviour
+        for (input of document.querySelectorAll('input')) {
+          console.log(input);
+          const selector = `label[for="${input.getAttribute('id')}"] [data-val]`;
+          let label = document.querySelector(selector);
+          label.innerHTML = input.value;
+          input.addEventListener('change', (e) => {
+            label.innerHTML = e.target.value;
+          });
+        };
       }
-      // create audio nodes
-      let masterGain = audioContext.createGain();
-      masterGain.gain.value = 1.0 / frequencies.length;
-      masterGain.connect(audioContext.destination);
-
-      let analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
-      analyser.smoothingTimeConstant = 0.0;
-      analyser.minDecibels = -62;
-
-      masterGain.connect(analyser);
-
-      let timeBuffer = new Uint8Array(analyser.frequencyBinCount);
-      let frequencyBuffer = new Uint8Array(analyser.frequencyBinCount);
-      let oscillators = {};
-
-      const playFrequency = (frequency) => {
-        if (frequency in oscillators) return;
-        let osc = audioContext.createOscillator();
-        osc.connect(masterGain);
-        osc.type = document.querySelector(`#waveform`).value;
-        osc.frequency.value = frequency;
-        osc.start();
-        oscillators[frequency] = osc;
-      };
-
-      const muteFrequency = (frequency) => {
-        if (oscillators[frequency]) {
-          oscillators[frequency].stop();
-          oscillators[frequency] = null;
-          delete oscillators[frequency];
-        }
-      };
-
-      (function animateCanvas() {
-        let spectrumCanvas = document.querySelector('canvas.spectrum');
-        let spectrumCtx = spectrumCanvas.getContext('2d');
-
-        let waveformCanvas = document.querySelector('canvas.waveform');
-        let waveformCtx = waveformCanvas.getContext('2d');
-
-        let resizeTimeout = null;
-
-        const adjustCanvasWidth = () => {
-          spectrumCanvas.setAttribute('width', spectrumCanvas.parentNode.offsetWidth);
-          waveformCanvas.setAttribute('width', waveformCanvas.parentNode.offsetWidth);
-        };
-        adjustCanvasWidth();
-        window.addEventListener('resize', (e) => {
-          clearTimeout(resizeTimeout);
-          resizeTimeout = setTimeout(adjustCanvasWidth, 100);
-        });
-
-        const frequencyBinIndex = (f) => {
-          const hzPerBin = (audioContext.sampleRate) / (2*analyser.frequencyBinCount);
-          return parseInt((f + hzPerBin/2) / hzPerBin);
-        };
-
-        const drawSpectrum = () => {
-          let ctx = spectrumCtx;
-          let buffer = frequencyBuffer;
-          let canvas = spectrumCanvas;
-          let bufferLength = buffer.byteLength / 5;
-
-          let height = canvas.height;
-
-          const dx = Math.max(1, 1.0*canvas.width / bufferLength);
-          analyser.getByteFrequencyData(buffer);
-
-          // clear canvas
-          ctx.fillStyle = 'rgba(0, 20, 0, 0.1)';
-          ctx.lineWidth = 1;
-          ctx.fillRect(0, 0, canvas.width, height);
-          // draw trigger markers
-          frequencies.forEach((f, i) => {
-            let binIndex = frequencyBinIndex(f);
-            ctx.fillStyle = buffer[binIndex] > 124 ? `rgb(0, 255, 0)` : `rgb(150, 150, 150)`
-            ctx.font = "18px monospace";
-            ctx.fillText(2, dx*binIndex - 6, 20);
-            ctx.font = "12px monospace";
-            ctx.fillText(i, dx*binIndex + 4, 11);
-          });
-
-          // draw latest response bar chart
-          ctx.fillStyle =  `rgb(0, 200, 0)`;
-          for (let i = 0; i < bufferLength; i++) {
-            let scale = 0.8 * height / 256;
-            let y = buffer[i]*scale;
-            ctx.fillRect(i*dx, height - y, Math.max(dx - 1, 1), y);
-          }
-          ctx.stroke();
-        }
-
-        const drawWaveform = () => {
-          let ctx = waveformCtx;
-          let buffer = timeBuffer;
-          let canvas = waveformCanvas;
-          let bufferLength = buffer.byteLength;
-
-          // Based on https://codepen.io/ContemporaryInsanity/pen/Mwvqpb
-          var width = canvas.width;
-          var height = canvas.height;
-          var scaling = height / 256;
-          var risingEdge = 0;
-          var edgeThreshold = 5;
-
-          analyser.getByteTimeDomainData(buffer);
-
-          // clear canvas
-          ctx.fillStyle = 'rgba(0, 10, 0, 0.1)';
-          ctx.fillRect(0, 0, width, height);
-
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = 'rgb(0, 200, 0)';
-          ctx.beginPath();
-
-          // No buffer overrun protection
-          while (buffer[risingEdge++] - 128 > 0 && risingEdge <= width);
-          if (risingEdge >= width) risingEdge = 0;
-
-          while (buffer[risingEdge++] - 128 < edgeThreshold && risingEdge <= width);
-          if (risingEdge >= width) risingEdge = 0;
-
-          for (var x = risingEdge; x < buffer.length && x - risingEdge < width; x++)
-            ctx.lineTo(x - risingEdge, height - buffer[x] * scaling);
-
-          ctx.stroke();
-        }
-
-        const draw = () => {
-          drawSpectrum();
-          drawWaveform();
-          let loop = requestAnimationFrame(draw);
-        }
-        draw();
-      })();
-
-      (function createHtmlPiano() {
-        const createDomElement = (frequency, note, octave) => {
-          let domElement = document.createElement('div');
-          domElement.setAttribute('data-note', note);
-          domElement.setAttribute('data-octave', octave);
-          domElement.setAttribute('data-frequency', frequency);
-          if (note === 'C')
-            domElement.innerHTML = `<span>${note}<sub>${octave}</sub></span>`;
-
-          const keyPressed = (e) => {
-            domElement.classList.add('pressed');
-            playFrequency(frequency);
-          };
-          const keyReleased = (e) => {
-            domElement.classList.remove('pressed');
-            muteFrequency(frequency);
-          };
-          ['mousedown', 'mouseover', 'touchstart', 'touchenter']
-            .forEach(event => domElement.addEventListener(event, keyPressed, false));
-          ['mouseup', 'mouseleave', 'touchend', 'touchleave']
-            .forEach(event => domElement.addEventListener(event, keyReleased, false));
-          return domElement;
-        };
-
-
-        let notes = ['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#'];
-        let frequencies = [27.5, 29.14, 30.87, 32.7, 34.65, 36.71, 38.89, 41.2, 43.65, 46.25, 49, 51.91, 55, 58.27, 61.74, 65.41, 69.3, 73.42, 77.78, 82.41, 87.31, 92.5, 98, 103.83, 110, 116.54, 123.47, 130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185, 196, 207.65, 220, 233.08, 246.94, 261.63, 277.18, 293.66, 311.13, 329.63, 349.23, 369.99, 392, 415.3, 440, 466.16, 493.88, 523.25, 554.37, 587.33, 622.25, 659.26, 698.46, 739.99, 784, 830.61, 880, 932.33, 987.77, 1046.5, 1108.73, 1174.66, 1244.51, 1318.5, 1396.91, 1479.98, 1568, 1661.22, 1760, 1864.7, 1975.53, 2093, 2217.46, 2349.32, 2489.02, 2637, 2793.83, 2959.96, 3135.96, 3322.44, 3520, 3729.31, 3951.07, 4186.01];
-        let keys = [];
-
-        let domContainer = document.querySelector('#piano');
-        let octave = 0;
-        for (let i = 0; i < frequencies.length; i++) {
-          let note = notes[i % notes.length];
-          if (note === 'C') octave++;
-          let domElement = createDomElement(frequencies[i], note, octave);
-          domContainer.appendChild(domElement);
-        }
-      })();
-
-      (function bindHtmlKeyboard() {
-        const trace = (state, label) => {
-          let str = state.toString(2);
-          let pad = "0b00000000"
-          let text = pad.substring(0, pad.length - str.length) + str;
-          document.querySelector('code.trace-binary').innerHTML = text;
-          document.querySelector('code.trace-text').innerHTML = label;
-        }
-
-
-        const byte2frequencies = (byte) => {
-          return frequencies.filter((_, i) => {
-            return byte & (1 << i);
-          });
-        };
-        const fireEvent = (element, eventType) => {
-          // Thanks to https://stackoverflow.com/a/2706236
-          if (element.fireEvent) {
-            element.fireEvent('on' + eventType);
-          } else {
-            let evObj = document.createEvent('Events');
-            evObj.initEvent(eventType, true, false);
-            element.dispatchEvent(evObj);
-          }
-        };
-        const press = (frequency) => {
-          let key = document.querySelector(`#piano [data-frequency="${frequency}"]`)
-          fireEvent(key, 'mousedown');
-        };
-        const release = (frequency) => {
-          let key = document.querySelector(`#piano [data-frequency="${frequency}"]`)
-          fireEvent(key, 'mouseup');
-        };
-
-        window.addEventListener('keydown', (e) => {
-          var value = e.key.length === 1 ? e.key.charCodeAt(0) : e.keyCode;
-          byte2frequencies(value).forEach(press);
-          trace(value, e.key);
-        });
-        window.addEventListener('keyup', (e) => {
-          frequencies.forEach(release);
-        });
-      })();
-
-      // config behaviour
-      for (input of document.querySelectorAll('input')) {
-        console.log(input);
-        const selector = `label[for="${input.getAttribute('id')}"] [data-val]`;
-        let label = document.querySelector(selector);
-        label.innerHTML = input.value;
-        input.addEventListener('change', (e) => {
-          label.innerHTML = e.target.value;
-        });
-      };
     </script>
   </body>
 </html>
