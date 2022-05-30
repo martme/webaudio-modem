@@ -24,7 +24,9 @@
     <input id="pause-duration" type="range" value="20" min="0", max="500", step="10">
 
     <script>
-      let oscillators = (function initialize() {
+      let oscillators;
+
+      function initialize() {
         const frequencies = [392, 784, 1046.5, 1318.5, 1568, 1864.7, 2093, 2637];
         let audioContext;
         if('webkitAudioContext' in window) {
@@ -43,7 +45,7 @@
           oscillator.start();
           return oscillator;
         });
-        let oscillators = frequencies.map(f => {
+        oscillators = frequencies.map(f => {
           let volume = audioContext.createGain();
           volume.gain.value = 0;
           return volume;
@@ -54,7 +56,7 @@
         oscillators.forEach((osc) => osc.connect(masterGain));
         masterGain.connect(audioContext.destination);
         return oscillators;
-      })();
+      };
 
       const char2oscillators = (char) => {
         return oscillators.filter((_, i) => {
@@ -94,6 +96,7 @@
       let button = document.querySelector('button[data-action="encode"]');
       button.addEventListener('click', () => {
         button.setAttribute('disabled', 'disabled');
+        if (!oscillators) initialize();
         encode(document.querySelector('textarea').value, () => {
           button.removeAttribute('disabled');
         });

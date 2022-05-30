@@ -5,6 +5,7 @@
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <title>martinmelhus.com - Web Audio Encoder</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="style.css">
   <style>
     body {
       background: #333;
@@ -24,62 +25,73 @@
   </style>
 </head>
 <body>
+  <div class="overlay">
+    <button>Start</button>
+  </div>
   <canvas></canvas>
   <script>
-    let canvas = document.querySelector('canvas');
-    let ctx = canvas.getContext('2d')
-
-    let WIDTH = +canvas.width;
-    let HEIGHT = +canvas.height;
-
-    /* responsive full screen canvas */
-    let resizeTimeout = null;
-    const resizeCanvas = () => {
-      canvas.setAttribute('width', canvas.parentNode.offsetWidth);
-      canvas.setAttribute('height', canvas.parentNode.offsetHeight);
-
-      WIDTH = +canvas.width;
-      HEIGHT = +canvas.height;
-    };
-    resizeCanvas();
-    window.addEventListener('resize', (e) => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resizeCanvas, 100);
-    });
-
-    const shiftUp = () => {
-      let imageData = ctx.getImageData(0, 1, WIDTH, HEIGHT);
-      ctx.clearRect(0, 0, WIDTH, HEIGHT);
-      ctx.putImageData(imageData, 0, 0);
-    }
-
-    let audioContext = new AudioContext();
-    let analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.0;
-
-    let buffer = new Uint8Array(analyser.frequencyBinCount);
-
-    // connect nodes
-    navigator.mediaDevices.getUserMedia({audio: true})
-    .then(stream => {
-      var microphone = audioContext.createMediaStreamSource(stream);
-      microphone.connect(analyser);
+    document.querySelector(".overlay > button").addEventListener("click", (e) => {
+      let overlay = e.currentTarget.parentNode;
+      overlay.parentNode.removeChild(overlay);
+      startSpectrogram();
     })
-    .catch(err => { alert("Microphone is required."); });
 
-    const draw = () => {
-      shiftUp()
-      analyser.getByteFrequencyData(buffer);
-      let dx = parseInt(Math.ceil(WIDTH / buffer.byteLength));
-      buffer.forEach((x, i) => {
-        let alpha = x / 256.0;
-        ctx.fillStyle = `rgba(100, 255, 100, ${alpha})`;
-        ctx.fillRect(i*dx, HEIGHT - 1, dx, 1);
+    function startSpectrogram() {
+      let canvas = document.querySelector('canvas');
+      let ctx = canvas.getContext('2d')
+
+      let WIDTH = +canvas.width;
+      let HEIGHT = +canvas.height;
+
+      /* responsive full screen canvas */
+      let resizeTimeout = null;
+      const resizeCanvas = () => {
+        canvas.setAttribute('width', canvas.parentNode.offsetWidth);
+        canvas.setAttribute('height', canvas.parentNode.offsetHeight);
+
+        WIDTH = +canvas.width;
+        HEIGHT = +canvas.height;
+      };
+      resizeCanvas();
+      window.addEventListener('resize', (e) => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(resizeCanvas, 100);
       });
-      let loop = requestAnimationFrame(draw);
+
+      const shiftUp = () => {
+        let imageData = ctx.getImageData(0, 1, WIDTH, HEIGHT);
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        ctx.putImageData(imageData, 0, 0);
+      }
+
+      let audioContext = new AudioContext();
+      let analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.0;
+
+      let buffer = new Uint8Array(analyser.frequencyBinCount);
+
+      // connect nodes
+      navigator.mediaDevices.getUserMedia({audio: true})
+      .then(stream => {
+        var microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
+      })
+      .catch(err => { alert("Microphone is required."); });
+
+      const draw = () => {
+        shiftUp()
+        analyser.getByteFrequencyData(buffer);
+        let dx = parseInt(Math.ceil(WIDTH / buffer.byteLength));
+        buffer.forEach((x, i) => {
+          let alpha = x / 256.0;
+          ctx.fillStyle = `rgba(100, 255, 100, ${alpha})`;
+          ctx.fillRect(i*dx, HEIGHT - 1, dx, 1);
+        });
+        let loop = requestAnimationFrame(draw);
+      }
+      draw();
     }
-    draw();
   </script>
 </body>
 </html>
